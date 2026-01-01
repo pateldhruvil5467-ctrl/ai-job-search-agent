@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🤖 AI Job Search & Shortlisting Agent
 
 An AI-powered agent that automates job discovery on LinkedIn and intelligently shortlists roles based on semantic similarity with a candidate’s resume.
@@ -85,3 +86,4 @@ Designed for:
 
 Dhruvil Patel  
 MSc Software Engineering (Germany)
+=======
