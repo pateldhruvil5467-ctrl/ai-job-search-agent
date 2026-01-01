@@ -1,0 +1,222 @@
+import pandas as pd
+
+# Read the formatted CSV
+df = pd.read_csv('jobs_formatted.csv')
+
+# Create an HTML table
+html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Job Listings</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-box {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        th {
+            padding: 20px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            padding: 18px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        
+        tbody tr {
+            transition: all 0.3s ease;
+        }
+        
+        tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+        
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .job-title {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .company {
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .location {
+            display: inline-block;
+            background: #e8f0ff;
+            color: #667eea;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .description {
+            color: #777;
+            font-size: 0.9em;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            th, td {
+                padding: 12px 10px;
+                font-size: 0.9em;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .description {
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💼 LinkedIn Job Listings</h1>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number">""" + str(len(df)) + """</div>
+                <div class="stat-label">Total Jobs</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">""" + str(df['company'].nunique()) + """</div>
+                <div class="stat-label">Companies</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">""" + str(df['location'].nunique()) + """</div>
+                <div class="stat-label">Locations</div>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Job Title</th>
+                    <th style="width: 20%;">Company</th>
+                    <th style="width: 15%;">Location</th>
+                    <th style="width: 35%;">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+
+# Add table rows
+for idx, row in df.iterrows():
+    html_content += f"""
+                <tr>
+                    <td class="job-title">{row['title']}</td>
+                    <td class="company">{row['company']}</td>
+                    <td><span class="location">{row['location']}</span></td>
+                    <td class="description">{row['description']}</td>
+                </tr>
+"""
+
+html_content += """
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p>📊 Data scraped from LinkedIn | Generated on 2025-12-26</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+# Save HTML file
+with open('jobs_table.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print("✅ HTML table created successfully!")
+print("📄 Saved as: jobs_table.html")
+print("\nOpen 'jobs_table.html' in your browser to view the formatted job listings table.")
