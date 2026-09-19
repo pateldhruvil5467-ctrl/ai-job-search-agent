@@ -1,12 +1,18 @@
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from dataclasses import asdict
 import time
 import pandas as pd
 import urllib.parse
 
+from models import Job
 
-def scrape_jobs_incrementally(driver, keyword, location, max_jobs=5):
+
+def scrape_jobs_incrementally(
+    driver: WebDriver, keyword: str, location: str, max_jobs: int = 5
+) -> None:
     """
     Scrapes LinkedIn job listings with robust error handling and multiple fallback selectors.
     
@@ -43,7 +49,7 @@ def scrape_jobs_incrementally(driver, keyword, location, max_jobs=5):
 
     print(f"🧩 Found {len(job_cards)} visible job cards")
 
-    jobs_data = []
+    jobs: list[Job] = []
 
     for index, job_card in enumerate(job_cards[:max_jobs]):
         try:
@@ -178,28 +184,21 @@ def scrape_jobs_incrementally(driver, keyword, location, max_jobs=5):
                 return result;
             """)
 
-            # Sanitize extracted data
-            title = str(job_data.get('title') or 'Unknown Title').strip()
-            company = str(job_data.get('company') or 'Unknown Company').strip()
-            location_text = str(job_data.get('location') or 'Unknown Location').strip()
-            description = str(job_data.get('description') or 'No description available').strip()
+            # Map raw extracted values into the Job domain model
+            job = Job.from_scraped_data(job_data)
+            jobs.append(job)
 
-            jobs_data.append({
-                "title": title,
-                "company": company,
-                "location": location_text,
-                "description": description
-            })
-
-            print(f"✅ Saved: {title} @ {company}")
+            print(f"✅ Saved: {job.title} @ {job.company}")
 
         except Exception as e:
             print(f"⚠️ Skipped one job: {str(e)[:80]}")
             continue
 
+    # ---------- Convert domain models to a pandas-compatible shape ----------
+    df = pd.DataFrame([asdict(job) for job in jobs])
+
     # ---------- Save results to CSV ----------
-    df = pd.DataFrame(jobs_data)
-    
+
     # Clean up the dataframe
     df['title'] = df['title'].str.strip()
     df['company'] = df['company'].str.strip()
