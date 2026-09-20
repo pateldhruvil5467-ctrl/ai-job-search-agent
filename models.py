@@ -19,10 +19,8 @@ class Job:
     def from_scraped_data(cls, data: dict) -> "Job":
         """Build a Job from the raw dict produced by the scraper.
 
-        Mirrors the sanitization already applied in
-        linkedin_scraper.scrape_jobs_incrementally (str() + strip(), with
-        the same fallback defaults) so mapping existing scraped data into
-        a Job reproduces identical values.
+        Single source of truth for turning scraped values into a Job:
+        str() + strip(), with fallback defaults for missing/falsy values.
         """
         return cls(
             title=str(data.get("title") or "Unknown Title").strip(),

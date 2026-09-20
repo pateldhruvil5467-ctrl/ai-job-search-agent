@@ -1,68 +1,26 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from dataclasses import asdict
 import time
-import pandas as pd
 import urllib.parse
 
+from job_extractor import RawJobData, extract_job
+from job_storage import save_jobs_csv
 from models import Job
 
 
-def scrape_jobs_incrementally(
-    driver: WebDriver, keyword: str, location: str, max_jobs: int = 5
-) -> None:
-    """
-    Scrapes LinkedIn job listings with robust error handling and multiple fallback selectors.
-    
-    Key improvements:
-    - JavaScript-based extraction for better DOM access
-    - Multiple selector strategies for resilience to LinkedIn layout changes
-    - Better error handling and data validation
-    - Fallback extraction methods when primary selectors fail
-    """
-    print("🚀 SCRAPER FUNCTION STARTED")
+def _read_raw_job(driver: WebDriver, job_card: WebElement) -> RawJobData:
+    driver.execute_script("arguments[0].click();", job_card)
+    time.sleep(3)
 
-    # ---------- Navigate explicitly to Jobs search ----------
-    keyword_encoded = urllib.parse.quote(keyword)
-    location_encoded = urllib.parse.quote(location)
+    # Scroll to top to ensure job details are visible
+    driver.execute_script("window.scrollTo(0, 0);")
+    time.sleep(1)
 
-    search_url = (
-        f"https://www.linkedin.com/jobs/search/"
-        f"?keywords={keyword_encoded}&location={location_encoded}"
-    )
-
-    print("🌍 Navigating to LinkedIn Jobs search page...")
-    driver.get(search_url)
-    time.sleep(5)
-
-    wait = WebDriverWait(driver, 20)
-
-    # ---------- Wait for job cards to load ----------
-    print("👀 Waiting for job cards...")
-    job_cards = wait.until(
-        EC.presence_of_all_elements_located(
-            (By.CSS_SELECTOR, "a.job-card-container__link")
-        )
-    )
-
-    print(f"🧩 Found {len(job_cards)} visible job cards")
-
-    jobs: list[Job] = []
-
-    for index, job_card in enumerate(job_cards[:max_jobs]):
-        try:
-            print(f"➡️ Opening job {index + 1}")
-            driver.execute_script("arguments[0].click();", job_card)
-            time.sleep(3)
-
-            # Scroll to top to ensure job details are visible
-            driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(1)
-
-            # ---------- Extract all job data using JavaScript ----------
-            job_data = driver.execute_script("""
+    # ---------- Extract all job data using JavaScript ----------
+    return driver.execute_script("""
                 const result = {
                     title: 'Unknown Title',
                     company: 'Unknown Company',
@@ -184,8 +142,55 @@ def scrape_jobs_incrementally(
                 return result;
             """)
 
+
+def scrape_jobs_incrementally(
+    driver: WebDriver, keyword: str, location: str, max_jobs: int = 5
+) -> None:
+    """
+    Scrapes LinkedIn job listings with robust error handling and multiple fallback selectors.
+    
+    Key improvements:
+    - JavaScript-based extraction for better DOM access
+    - Multiple selector strategies for resilience to LinkedIn layout changes
+    - Better error handling and data validation
+    - Fallback extraction methods when primary selectors fail
+    """
+    print("🚀 SCRAPER FUNCTION STARTED")
+
+    # ---------- Navigate explicitly to Jobs search ----------
+    keyword_encoded = urllib.parse.quote(keyword)
+    location_encoded = urllib.parse.quote(location)
+
+    search_url = (
+        f"https://www.linkedin.com/jobs/search/"
+        f"?keywords={keyword_encoded}&location={location_encoded}"
+    )
+
+    print("🌍 Navigating to LinkedIn Jobs search page...")
+    driver.get(search_url)
+    time.sleep(5)
+
+    wait = WebDriverWait(driver, 20)
+
+    # ---------- Wait for job cards to load ----------
+    print("👀 Waiting for job cards...")
+    job_cards = wait.until(
+        EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, "a.job-card-container__link")
+        )
+    )
+
+    print(f"🧩 Found {len(job_cards)} visible job cards")
+
+    jobs: list[Job] = []
+
+    for index, job_card in enumerate(job_cards[:max_jobs]):
+        try:
+            print(f"➡️ Opening job {index + 1}")
+            raw_job = _read_raw_job(driver, job_card)
+
             # Map raw extracted values into the Job domain model
-            job = Job.from_scraped_data(job_data)
+            job = extract_job(raw_job)
             jobs.append(job)
 
             print(f"✅ Saved: {job.title} @ {job.company}")
@@ -194,23 +199,8 @@ def scrape_jobs_incrementally(
             print(f"⚠️ Skipped one job: {str(e)[:80]}")
             continue
 
-    # ---------- Convert domain models to a pandas-compatible shape ----------
-    df = pd.DataFrame([asdict(job) for job in jobs])
+    df = save_jobs_csv(jobs)
 
-    # ---------- Save results to CSV ----------
-
-    # Clean up the dataframe
-    df['title'] = df['title'].str.strip()
-    df['company'] = df['company'].str.strip()
-    df['location'] = df['location'].str.strip()
-    df['description'] = df['description'].str.strip()
-    
-    # Remove completely empty rows
-    df = df[(df['title'] != 'Unknown Title') & (df['company'] != 'Unknown Company')]
-    
-    # Save with proper CSV formatting
-    df.to_csv("jobs.csv", index=False, quoting=1, escapechar='\\')
-    
     print("📁 jobs.csv updated with real data")
     print(f"✅ Total jobs saved: {len(df)}")
     print("\n📊 Sample data:")
