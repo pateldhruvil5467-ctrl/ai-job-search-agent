@@ -14,6 +14,7 @@ class Job:
     company: str
     location: str
     description: str
+    url: str = ""  # canonical LinkedIn job URL; "" when the scraper could not read one
 
     @classmethod
     def from_scraped_data(cls, data: dict) -> "Job":
@@ -27,4 +28,5 @@ class Job:
             company=str(data.get("company") or "Unknown Company").strip(),
             location=str(data.get("location") or "Unknown Location").strip(),
             description=str(data.get("description") or "No description available").strip(),
+            url=str(data.get("url") or "").strip(),
         )

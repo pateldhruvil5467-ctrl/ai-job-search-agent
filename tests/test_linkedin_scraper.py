@@ -14,7 +14,8 @@ import linkedin_scraper
 from linkedin_scraper import NoJobsExtractedError, build_search_url, scrape_jobs
 from models import Job
 
-COLUMNS = ["title", "company", "location", "description"]
+COLUMNS = ["title", "company", "location", "description", "url"]
+JOB_URL = "https://www.linkedin.com/jobs/view/3812345678/"
 
 
 def raw(**overrides) -> dict:
@@ -160,14 +161,29 @@ class TestSuccessfulScrape:
         scrape_jobs(browser, "kw", "loc")
 
         assert saved_rows(workdir) == [
-            {"title": "Backend Engineer", "company": "Acme", "location": "Remote", "description": "First"},
-            {"title": "Data Engineer", "company": "Globex", "location": "Berlin", "description": "Second"},
+            {"title": "Backend Engineer", "company": "Acme", "location": "Remote", "description": "First", "url": ""},
+            {"title": "Data Engineer", "company": "Globex", "location": "Berlin", "description": "Second", "url": ""},
         ]
 
     def test_csv_has_the_expected_columns(self, workdir):
         scrape_jobs(FakeBrowser([raw()]), "kw", "loc")
 
         assert list(saved_rows(workdir)[0].keys()) == COLUMNS
+
+    def test_the_url_from_the_browser_reaches_the_job_and_the_csv(self, workdir, monkeypatch):
+        handed_over = []
+        real_save = linkedin_scraper.save_jobs_csv
+
+        def spy(jobs):
+            handed_over.extend(jobs)
+            return real_save(jobs)
+
+        monkeypatch.setattr(linkedin_scraper, "save_jobs_csv", spy)
+
+        scrape_jobs(FakeBrowser([raw(title="A", url=f"  {JOB_URL}  "), raw(title="B")]), "kw", "loc")
+
+        assert [job.url for job in handed_over] == [JOB_URL, ""]
+        assert [row["url"] for row in saved_rows(workdir)] == [JOB_URL, ""]
 
     def test_returns_nothing(self):
         assert scrape_jobs(FakeBrowser([raw()]), "kw", "loc") is None
@@ -279,12 +295,14 @@ class TestIncompleteData:
                 "company": "Real Co",
                 "location": "Unknown Location",
                 "description": "No description available",
+                "url": "",
             },
             {
                 "title": "Sparse",
                 "company": "Sparse Co",
                 "location": "Unknown Location",
                 "description": "No description available",
+                "url": "",
             },
         ]
 
@@ -315,7 +333,7 @@ class TestIncompleteData:
 
         scrape_jobs(FakeBrowser([blank, blank]), "kw", "loc")
 
-        assert (workdir / "jobs.csv").read_text(encoding="utf-8").strip() == '"title","company","location","description"'
+        assert (workdir / "jobs.csv").read_text(encoding="utf-8").strip() == '"title","company","location","description","url"'
         assert "Total jobs saved: 0" in capsys.readouterr().out
 
 

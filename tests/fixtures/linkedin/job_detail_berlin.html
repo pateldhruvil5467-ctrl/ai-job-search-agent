@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<!--
+  SYNTHETIC fixture: hand-written to resemble a LinkedIn job page. It is NOT a capture of the real site,
+  so tests against it prove our extraction logic only, not that the real DOM matches these selectors.
+  To adapt to the real DOM: save a real page (outerHTML), strip personal data, and add it beside this file.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Working Student Software Engineer | Acme Logistics GmbH | LinkedIn</title>
+  <link rel="canonical" href="https://www.linkedin.com/jobs/view/3812345678/">
+  <style>.hidden { display: none; }</style>
+  <script>window.__bootstrap = {"workplace": "Remote", "note": "Remote inside a script must be ignored"};</script>
+</head>
+<body>
+  <header class="global-nav">
+    <nav aria-label="Primary navigation">
+      <ul>
+        <li><a href="/feed/">Home</a></li>
+        <li><a href="/mynetwork/">My Network</a></li>
+        <li><a href="/jobs/">Jobs</a></li>
+        <li><a href="/messaging/">Messaging</a></li>
+        <li><a href="/notifications/">Notifications</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <section class="search-filters-bar">
+    <button type="button">Date posted</button>
+    <button type="button">Experience level</button>
+    <button type="button">Remote</button>
+    <button type="button">Easy Apply</button>
+  </section>
+
+  <main class="scaffold-layout">
+    <div class="scaffold-layout__list">
+      <ul>
+        <li class="jobs-search-results__list-item">
+          <a class="job-card-container__link" href="/jobs/view/3812345678/?eBP=NOT_ELIGIBLE_FOR_CHARGING&amp;refId=Zb3%2Fq1w%3D%3D&amp;trackingId=Ab12Cd34%3D%3D&amp;trk=flagship3_search_srp_jobs">
+            Working Student Software Engineer
+          </a>
+          <div class="artdeco-entity-lockup__subtitle">Acme Logistics GmbH</div>
+          <div class="artdeco-entity-lockup__caption">Berlin, Germany</div>
+        </li>
+        <li class="jobs-search-results__list-item">
+          <a class="job-card-container__link" href="/jobs/view/3999999999/?trackingId=other">
+            Senior Backend Engineer
+          </a>
+          <div class="artdeco-entity-lockup__subtitle">Globex Corporation</div>
+          <div class="artdeco-entity-lockup__caption">Remote</div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="jobs-search__job-details--container">
+      <div class="job-details-jobs-unified-top-card__container--two-pane">
+        <h1 class="t-24 t-bold"><a href="/jobs/view/3812345678/">Working Student Software Engineer</a></h1>
+        <div class="job-details-jobs-unified-top-card__company-name">
+          <a href="https://www.linkedin.com/company/acme-logistics/">Acme Logistics GmbH</a>
+        </div>
+        <div class="job-details-jobs-unified-top-card__primary-description-container">
+          <div class="t-black--light mt2">
+            <span class="tvm__text tvm__text--low-emphasis">Berlin, Germany</span>
+            <span class="tvm__text tvm__text--low-emphasis"> · </span>
+            <span class="tvm__text tvm__text--low-emphasis">1 week ago</span>
+            <span class="tvm__text tvm__text--low-emphasis"> · </span>
+            <span class="tvm__text tvm__text--low-emphasis">Over 100 applicants</span>
+          </div>
+          <div class="t-black--light">Promoted by hirer · Actively reviewing applicants</div>
+        </div>
+        <div class="mt4">
+          <ul>
+            <li><span class="ui-label">On-site</span></li>
+            <li><span class="ui-label">Part-time</span></li>
+          </ul>
+          <button type="button">Easy Apply</button>
+          <button type="button">Save</button>
+        </div>
+      </div>
+
+      <article class="jobs-description">
+        <h2>About the job</h2>
+        <section class="show-more-less-html">
+          <div class="show-more-less-html__markup show-more-less-html__markup--clamp-after-5">
+            <p><strong>About the role</strong></p>
+            <p>Acme Logistics builds route-planning software for mid-sized European retailers. As a working student in our platform team you will help us ship features that make deliveries faster and greener.</p>
+            <p><strong>What you will do</strong></p>
+            <ul>
+              <li>Build and test REST endpoints for our route optimisation service</li>
+              <li>Improve the reliability of our data pipelines</li>
+              <li>Review code and pair with senior engineers</li>
+            </ul>
+            <p><strong>What we offer</strong></p>
+            <p>Flexible hours around your lectures, a mentor from day one and occasional remote work when the team agrees on it.</p>
+            <!-- EXTRA_PARAGRAPHS -->
+            <p><strong>Requirements</strong></p>
+            <ul>
+              <li>Currently enrolled in a Computer Science or related degree at a German university</li>
+              <li>Solid experience with Python and SQL</li>
+              <li>Fluent English; German is a plus</li>
+              <li>Available for 15 to 20 hours per week</li>
+            </ul>
+          </div>
+          <button class="show-more-less-html__button" type="button">Show more</button>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <p>About · Accessibility · Help Center · Privacy &amp; Terms · Remote work policy</p>
+  </footer>
+</body>
+</html>

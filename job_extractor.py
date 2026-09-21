@@ -2,6 +2,8 @@ from typing import Any
 
 from models import Job
 
+# Keys a browser adapter provides: title, company, location, description, url.
+# Any of them may be missing or None; Job.from_scraped_data applies the defaults.
 RawJobData = dict[str, Any]
 
 

@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from job_extractor import RawJobData
+from job_page_parser import canonical_job_url, parse_job_page
 
 JobCard = Any
 
@@ -41,6 +42,9 @@ class SeleniumJobBrowser:
         )
 
     def read_job(self, job_card: WebElement) -> RawJobData:
+        # Read the link first: clicking can re-render the results list and stale the card.
+        url = canonical_job_url(job_card.get_attribute("href"))
+
         self._driver.execute_script("arguments[0].click();", job_card)
         time.sleep(3)
 
@@ -49,12 +53,10 @@ class SeleniumJobBrowser:
         time.sleep(1)
 
         # ---------- Extract all job data using JavaScript ----------
-        return self._driver.execute_script("""
+        page_data = self._driver.execute_script("""
                 const result = {
                     title: 'Unknown Title',
                     company: 'Unknown Company',
-                    location: 'Unknown Location',
-                    description: 'No description available'
                 };
                 
                 // === EXTRACT JOB TITLE ===
@@ -107,66 +109,19 @@ class SeleniumJobBrowser:
                     }
                 }
                 
-                // === EXTRACT LOCATION ===
-                // Look through all text for location patterns
-                let bodyText = document.body.innerText;
-                let locationPatterns = ['Remote', 'On-site', 'Hybrid'];
-                for (let pattern of locationPatterns) {
-                    if (bodyText.includes(pattern)) {
-                        result.location = pattern;
-                        break;
-                    }
-                }
-                
-                // Look for city, state pattern
-                if (result.location === 'Unknown Location') {
-                    let allText = document.body.innerText.split('\\n');
-                    for (let line of allText) {
-                        if (line.includes(',') && line.length < 50 && !line.includes('Search') && !line.includes('Premium')) {
-                            result.location = line.trim();
-                            break;
-                        }
-                    }
-                }
-                
-                // === EXTRACT DESCRIPTION ===
-                // Primary: show-more-less markup (LinkedIn standard)
-                let descEl = document.querySelector('div.show-more-less-html__markup');
-                if (descEl) {
-                    let text = (descEl.innerText || descEl.textContent || '').trim();
-                    if (text && text.length > 50 && !text.includes('Premium')) {
-                        result.description = text.substring(0, 1500);
-                    }
-                }
-                
-                // Fallback 1: Check all divs for substantial content
-                if (result.description === 'No description available') {
-                    let divs = document.querySelectorAll('div[class*="description"], div[class*="show-more"]');
-                    for (let div of divs) {
-                        let text = (div.innerText || div.textContent || '').trim();
-                        if (text && text.length > 100 && !text.includes('Premium') && !text.includes('Search')) {
-                            result.description = text.substring(0, 1500);
-                            break;
-                        }
-                    }
-                }
-                
-                // Fallback 2: Find largest text block
-                if (result.description === 'No description available') {
-                    let allDivs = document.querySelectorAll('div');
-                    let largestText = '';
-                    for (let div of allDivs) {
-                        let text = (div.innerText || '').trim();
-                        if (text.length > largestText.length && text.length > 100 && text.length < 3000) {
-                            if (!text.includes('Search') && !text.includes('Premium') && !text.includes('Sign')) {
-                                largestText = text;
-                            }
-                        }
-                    }
-                    if (largestText.length > 100) {
-                        result.description = largestText.substring(0, 1500);
-                    }
-                }
+                // === CAPTURE PAGE HTML ===
+                // Location and description are interpreted in Python (job_page_parser.py), where
+                // they can be tested offline against saved page snapshots.
+                result.html = document.documentElement.outerHTML;
                 
                 return result;
             """)
+
+        details = parse_job_page(page_data.get("html") or "")
+        return {
+            "title": page_data.get("title"),
+            "company": page_data.get("company"),
+            "location": details.location,
+            "description": details.description,
+            "url": url,
+        }

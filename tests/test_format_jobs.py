@@ -31,10 +31,12 @@ def job_row(**overrides: str) -> dict[str, str]:
     return row
 
 
-def run_format_jobs(workdir: Path, rows: list[dict[str, str]]) -> list[dict[str, str]]:
+def run_format_jobs(
+    workdir: Path, rows: list[dict[str, str]], columns: list[str] = COLUMNS
+) -> list[dict[str, str]]:
     """Write rows to <workdir>/jobs.csv, run format_jobs.py there, return its output rows."""
     with open(workdir / "jobs.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=COLUMNS, quoting=csv.QUOTE_ALL)
+        writer = csv.DictWriter(f, fieldnames=columns, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(rows)
 
@@ -76,6 +78,68 @@ class TestOutputShape:
 
         # Formatting must write to a separate file, never rewrite the raw scrape.
         assert b"  Messy   Title " in raw_after_first_run
+
+
+class TestJobsCsvWithUrlColumn:
+    """jobs.csv gained a fifth "url" column. format_jobs.py must keep working and keep its four-column output."""
+
+    WITH_URL = COLUMNS + ["url"]
+
+    def test_a_jobs_csv_with_a_url_column_is_accepted_and_the_output_keeps_exactly_four_columns(self, tmp_path):
+        rows = run_format_jobs(
+            tmp_path,
+            [job_row(url="https://www.linkedin.com/jobs/view/3812345678/")],
+            columns=self.WITH_URL,
+        )
+
+        assert list(rows[0].keys()) == COLUMNS
+        assert rows == [job_row()]
+
+    def test_the_url_is_not_forwarded_to_the_formatted_file(self, tmp_path):
+        run_format_jobs(tmp_path, [job_row(url="https://www.linkedin.com/jobs/view/3812345678/")], columns=self.WITH_URL)
+
+        assert "linkedin.com" not in (tmp_path / "jobs_formatted.csv").read_text(encoding="utf-8")
+
+    def test_output_is_identical_with_and_without_the_url_column(self, tmp_path):
+        jobs = [
+            job_row(title="  Padded   Title ", description=f"Berlin, Berlin, Germany {DOT} 3 weeks ago {DOT} x"),
+            job_row(title="Unknown Title"),
+            job_row(title="Other", company="Globex", description=""),
+        ]
+        without_dir, with_dir = tmp_path / "without", tmp_path / "with"
+        without_dir.mkdir()
+        with_dir.mkdir()
+
+        without_url = run_format_jobs(without_dir, jobs)
+        with_url = run_format_jobs(
+            with_dir, [dict(job, url="https://www.linkedin.com/jobs/view/1/") for job in jobs], columns=self.WITH_URL
+        )
+
+        assert with_url == without_url
+
+    def test_duplicates_are_still_decided_by_title_and_company_only(self, tmp_path):
+        rows = run_format_jobs(
+            tmp_path,
+            [
+                job_row(description="first", url="https://www.linkedin.com/jobs/view/1/"),
+                job_row(description="second", url="https://www.linkedin.com/jobs/view/2/"),
+            ],
+            columns=self.WITH_URL,
+        )
+
+        assert [r["description"] for r in rows] == ["first"]
+
+    def test_empty_and_awkward_urls_do_not_break_the_run(self, tmp_path):
+        rows = run_format_jobs(
+            tmp_path,
+            [
+                job_row(title="No Url", url=""),
+                job_row(title="Odd Url", url='https://example.test/a?x=1&y="q",z'),
+            ],
+            columns=self.WITH_URL,
+        )
+
+        assert [r["title"] for r in rows] == ["No Url", "Odd Url"]
 
 
 class TestWhitespaceHandling:

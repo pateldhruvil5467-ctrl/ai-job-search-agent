@@ -11,13 +11,15 @@ from models import Job
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-FIELDS = ["title", "company", "location", "description"]
+FIELDS = ["title", "company", "location", "description", "url"]
 DEFAULTS = {
     "title": "Unknown Title",
     "company": "Unknown Company",
     "location": "Unknown Location",
     "description": "No description available",
+    "url": "",
 }
+JOB_URL = "https://www.linkedin.com/jobs/view/3812345678/"
 
 
 def raw_job(**overrides) -> dict:
@@ -26,6 +28,7 @@ def raw_job(**overrides) -> dict:
         "company": "Example GmbH",
         "location": "Berlin",
         "description": "Some description",
+        "url": JOB_URL,
     }
     raw.update(overrides)
     return raw
@@ -40,7 +43,17 @@ class TestValidData:
             company="Example GmbH",
             location="Berlin",
             description="Some description",
+            url=JOB_URL,
         )
+
+    def test_the_url_is_carried_from_the_raw_data_into_the_job(self):
+        assert extract_job(raw_job(url=JOB_URL)).url == JOB_URL
+
+    def test_raw_data_without_a_url_still_becomes_a_job_with_an_empty_url(self):
+        raw = raw_job()
+        del raw["url"]
+
+        assert extract_job(raw).url == ""
 
     def test_result_is_a_job_instance(self):
         assert isinstance(extract_job(raw_job()), Job)
@@ -163,7 +176,7 @@ class TestSingleSourceOfTruth:
 
 
 class TestBrowserIndependence:
-    @pytest.mark.parametrize("module", ["job_extractor", "job_storage", "models"])
+    @pytest.mark.parametrize("module", ["job_extractor", "job_storage", "models", "job_page_parser"])
     def test_importing_the_layer_does_not_load_selenium(self, module):
         # Fresh interpreter, so this can't be masked by another test importing selenium.
         result = subprocess.run(
