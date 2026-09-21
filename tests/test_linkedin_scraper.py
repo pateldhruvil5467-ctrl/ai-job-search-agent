@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import linkedin_scraper
-from linkedin_scraper import scrape_jobs
+from linkedin_scraper import NoJobsExtractedError, build_search_url, scrape_jobs
 from models import Job
 
 COLUMNS = ["title", "company", "location", "description"]
@@ -31,14 +31,22 @@ def raw(**overrides) -> dict:
 class FakeBrowser:
     """Scripted JobBrowser: one entry per card, either raw data to return or an Exception to raise."""
 
-    def __init__(self, results, find_error: Exception | None = None):
+    def __init__(
+        self,
+        results,
+        find_error: Exception | None = None,
+        open_error: Exception | None = None,
+    ):
         self._results = list(results)
         self._find_error = find_error
+        self._open_error = open_error
         self.cards = [f"card-{i}" for i in range(len(self._results))]
         self.events: list[str] = []
 
     def open_page(self, url: str) -> None:
         self.events.append(f"open {url}")
+        if self._open_error is not None:
+            raise self._open_error
 
     def find_job_cards(self):
         self.events.append("find_job_cards")
@@ -85,11 +93,12 @@ class TestNavigation:
         )
 
     def test_keyword_and_location_are_url_encoded(self):
-        browser = FakeBrowser([raw()])
+        url = build_search_url("C++ & Data", "München")
 
-        scrape_jobs(browser, "C++ & Data", "München")
-
-        assert browser.events[0].endswith("?keywords=C%2B%2B%20%26%20Data&location=M%C3%BCnchen")
+        assert url == (
+            "https://www.linkedin.com/jobs/search/"
+            "?keywords=C%2B%2B%20%26%20Data&location=M%C3%BCnchen"
+        )
 
     def test_page_is_opened_then_cards_are_found_then_cards_are_read(self):
         browser = FakeBrowser([raw()])
@@ -126,6 +135,17 @@ class TestMaxJobs:
         scrape_jobs(browser, "kw", "loc")
 
         assert len(browser.cards_read) == 5
+
+    def test_max_jobs_limits_the_cards_attempted_not_the_jobs_saved(self, workdir):
+        # A failed card is not replaced by the next one, so fewer than max_jobs jobs can be saved.
+        browser = FakeBrowser(
+            [raw(title="A"), RuntimeError("boom"), raw(title="C"), raw(title="D"), raw(title="E")]
+        )
+
+        scrape_jobs(browser, "kw", "loc", max_jobs=3)
+
+        assert browser.cards_read == ["card-0", "card-1", "card-2"]
+        assert saved_titles(workdir) == ["A", "C"]
 
 
 class TestSuccessfulScrape:
@@ -300,29 +320,63 @@ class TestIncompleteData:
 
 
 class TestZeroJobsExtracted:
-    """Known issue, preserved on purpose.
+    """When not a single job can be extracted the scrape fails loudly and clearly.
 
-    When no Job is created at all, storage builds a DataFrame with no columns and the cleaning
-    step raises KeyError('title'). The scraper does not catch it and jobs.csv is not written.
-    (Different from "every job is Unknown", which writes a header-only CSV; see above.)
+    This used to surface as a cryptic KeyError('title') from the storage layer. Both the loud
+    failure and the untouched jobs.csv are unchanged; only the error is now explicit.
+    (Different from "every job is Unknown", which still writes a header-only CSV; see above.)
     """
 
     @pytest.mark.parametrize(
-        "results, max_jobs",
+        "results, max_jobs, cards_attempted",
         [
-            pytest.param([], 5, id="no-cards-found"),
-            pytest.param([RuntimeError("a"), RuntimeError("b")], 5, id="every-card-fails"),
-            pytest.param([raw(), raw()], 0, id="max-jobs-is-zero"),
+            pytest.param([], 5, 0, id="no-cards-found"),
+            pytest.param([RuntimeError("a"), RuntimeError("b")], 5, 2, id="every-card-fails"),
+            pytest.param([raw(), raw()], 0, 0, id="max-jobs-is-zero"),
         ],
     )
-    def test_crashes_with_keyerror_and_writes_no_csv(self, workdir, results, max_jobs):
-        with pytest.raises(KeyError, match="title"):
+    def test_raises_a_clear_error_naming_how_many_cards_were_tried(
+        self, workdir, results, max_jobs, cards_attempted
+    ):
+        expected = rf"from {cards_attempted} job card\(s\); jobs\.csv was not updated"
+
+        with pytest.raises(NoJobsExtractedError, match=expected):
             scrape_jobs(FakeBrowser(results), "kw", "loc", max_jobs=max_jobs)
 
         assert not (workdir / "jobs.csv").exists()
 
+    def test_a_previous_jobs_csv_is_not_overwritten(self, workdir):
+        previous = '"title","company","location","description"\n"Old","Old Co","Remote","kept"\n'
+        (workdir / "jobs.csv").write_text(previous, encoding="utf-8")
 
-class TestDiscoveryFailure:
+        with pytest.raises(NoJobsExtractedError):
+            scrape_jobs(FakeBrowser([RuntimeError("boom")]), "kw", "loc")
+
+        assert (workdir / "jobs.csv").read_text(encoding="utf-8") == previous
+
+    def test_storage_is_not_called(self, monkeypatch):
+        def storage_must_not_run(jobs):
+            raise AssertionError("save_jobs_csv must not be called when there are no jobs")
+
+        monkeypatch.setattr(linkedin_scraper, "save_jobs_csv", storage_must_not_run)
+
+        with pytest.raises(NoJobsExtractedError):
+            scrape_jobs(FakeBrowser([RuntimeError("boom")]), "kw", "loc")
+
+
+class TestPageLevelFailures:
+    """Failures outside the per-card loop are not skipped: they abort the scrape."""
+
+    def test_failure_to_open_the_page_propagates_and_nothing_is_read_or_saved(self, workdir):
+        browser = FakeBrowser([raw()], open_error=ConnectionError("network unreachable"))
+
+        with pytest.raises(ConnectionError, match="network unreachable"):
+            scrape_jobs(browser, "kw", "loc")
+
+        assert "find_job_cards" not in browser.events
+        assert browser.cards_read == []
+        assert not (workdir / "jobs.csv").exists()
+
     def test_failure_to_find_cards_propagates_and_nothing_is_read_or_saved(self, workdir):
         browser = FakeBrowser([raw()], find_error=TimeoutError("no job cards appeared"))
 
@@ -331,3 +385,22 @@ class TestDiscoveryFailure:
 
         assert browser.cards_read == []
         assert not (workdir / "jobs.csv").exists()
+
+
+class TestStorageFailure:
+    def test_a_storage_error_propagates_and_is_not_mistaken_for_a_skipped_card(
+        self, monkeypatch, capsys
+    ):
+        def failing_save(jobs):
+            raise PermissionError("jobs.csv is open in another program")
+
+        monkeypatch.setattr(linkedin_scraper, "save_jobs_csv", failing_save)
+        browser = FakeBrowser([raw(title="A"), raw(title="B")])
+
+        with pytest.raises(PermissionError, match="open in another program"):
+            scrape_jobs(browser, "kw", "loc")
+
+        out = capsys.readouterr().out
+        assert browser.cards_read == ["card-0", "card-1"]
+        assert "Skipped one job" not in out
+        assert "Total jobs saved" not in out

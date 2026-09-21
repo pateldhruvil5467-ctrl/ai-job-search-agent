@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from job_storage import JOBS_CSV_PATH, clean_jobs_dataframe, jobs_to_dataframe, save_jobs_csv
 from models import Job
@@ -121,6 +122,17 @@ class TestSaveJobsCsv:
         save_jobs_csv([make_job()], path)
 
         assert read_text_lf(path).splitlines()[0] == '"title","company","location","description"'
+
+    def test_saving_no_jobs_at_all_fails_and_writes_nothing(self, tmp_path):
+        # Known limitation of this layer, deliberately left as-is: an empty list gives a DataFrame
+        # with no columns, so cleaning raises KeyError. scrape_jobs() guards against this with
+        # NoJobsExtractedError, so an empty scrape never reaches storage.
+        path = tmp_path / "jobs.csv"
+
+        with pytest.raises(KeyError, match="title"):
+            save_jobs_csv([], path)
+
+        assert not path.exists()
 
     def test_returns_the_cleaned_dataframe_that_was_written(self, tmp_path):
         jobs = [make_job(title="Keep"), make_job(title="Unknown Title"), make_job(company="Unknown Company")]
