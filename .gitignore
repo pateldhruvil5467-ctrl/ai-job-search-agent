@@ -23,3 +23,6 @@ Thumbs.db
 
 # Generated output
 output/
+
+# User-specific data (resume, candidate profile, application records) — never commit
+private/

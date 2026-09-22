@@ -1,7 +1,4 @@
 selenium
 webdriver-manager
 pandas
-pdfplumber
-sentence-transformers
-scikit-learn
 
