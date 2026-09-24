@@ -2,7 +2,7 @@
 
 A local, Selenium-based tool that automates LinkedIn job discovery through a manual, human-in-the-loop login, extracts structured job data from the results, and persists it to CSV for review.
 
-This is **not yet** an AI agent. There is no candidate profile, resume parsing, semantic matching, LLM evaluation, scoring, or autonomous decision-making in the codebase today — those are planned (see [Roadmap](#-roadmap) below) but not implemented.
+This is **not yet** an AI agent. A candidate profile model and a deterministic resume-reading pipeline now exist, but there are no candidate preferences, semantic matching, LLM evaluation, scoring, or autonomous decision-making in the codebase today — those are planned (see [Roadmap](#-roadmap) below) but not implemented.
 
 ---
 
@@ -15,14 +15,16 @@ This is **not yet** an AI agent. There is no candidate profile, resume parsing, 
 - 📄 CSV persistence — jobs are written to `jobs.csv` (`save_jobs_csv`) and can be read back (`load_jobs_csv`)
 - 🔑 A stable `job_key()` identity for each posting, so the same listing can be recognized across separate scrapes
 - 🧹 A separate, legacy cleaning/reporting pipeline: `format_jobs.py` → `jobs_formatted.csv`, plus an HTML report (`generate_html_table.py`) and a console summary (`status_report.py`)
-- ✅ An offline pytest suite covering the domain model, storage, extraction, and the browser adapter through fakes — no Chrome or LinkedIn access required to run the tests
+- 🧑 A typed, immutable `CandidateProfile` model — skills, experience, education (`candidate.py`)
+- 📄 Resume PDF text extraction — `extract_resume_text()` returns the plain text of a PDF (`resume_pdf.py`)
+- 🧾 Deterministic structured resume interpretation — `parse_candidate_profile()` turns plain text in a small, explicit format (labelled `SKILLS` / `EXPERIENCE` / `EDUCATION` sections, `|`-separated entries) into a `CandidateProfile`, skipping anything it cannot interpret (`candidate_parser.py`). It is rule-based, not AI, and does not understand arbitrary resume layouts; PDF extraction and interpretation are separate steps that are not yet wired together.
+- ✅ An offline pytest suite covering the domain model, storage, extraction, resume reading, and the browser adapter through fakes — no Chrome or LinkedIn access required to run the tests
 
 ### Planned, not implemented
 
 The following are part of the intended direction for this project but do **not** exist in the code yet:
 
-- 🧑 Candidate profile (skills, experience, preferences)
-- 📄 Resume parsing
+- 🙋 Candidate preferences
 - 🎯 Deterministic job/candidate matching rules
 - 🧠 LLM-based evaluation of a job against a candidate
 - 📊 Job/candidate match scoring
@@ -183,8 +185,9 @@ Foundation
   ✓ Documentation & dependency hygiene
 
 Candidate intelligence
-  □ CandidateProfile
-  □ Resume parsing
+  ✓ CandidateProfile
+  ✓ Resume PDF text extraction
+  ✓ Structured resume interpretation (deterministic, rule-based)
   □ Candidate preferences
 
 Matching
@@ -205,7 +208,7 @@ Agent
   □ Application tracking
 ```
 
-Everything below "Foundation" is **not implemented**.
+Everything unchecked above is **not implemented**.
 
 ---
 
