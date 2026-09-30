@@ -135,7 +135,7 @@ class TestReadJob:
         assert raw["description"].startswith("About the role")
         assert raw["description"].endswith("- Available for 15 to 20 hours per week")
         assert raw["url"] == JOB_URL
-        assert set(raw) == {"title", "company", "location", "description", "url"}
+        assert set(raw) == {"title", "company", "location", "description", "url", "employment_type"}
 
     def test_the_url_comes_from_the_card_link_without_any_extra_navigation(self, driver):
         driver.extractions = [page_data()]
@@ -185,6 +185,26 @@ class TestReadJob:
         assert raw["title"] == "Data Engineer"
         assert raw["location"] is None
         assert raw["description"] is None
+
+    @pytest.mark.parametrize(
+        "fixture_name, expected_employment_type",
+        [
+            ("berlin", "Part-time"),
+            ("remote", "Full-time"),
+            ("hybrid", "Part-time"),
+            ("missing_location", None),
+        ],
+    )
+    def test_employment_type_is_forwarded_from_the_parsed_page_for_each_fixture(
+        self, driver, fixture_name, expected_employment_type
+    ):
+        # The exact value comes from parse_job_page() (proven against these same fixtures in
+        # tests/test_employment_type_extraction.py); this only checks that read_job() forwards it.
+        driver.extractions = [page_data(html=fixture_html(fixture_name))]
+
+        raw = SeleniumJobBrowser(driver).read_job(driver.card("card-0"))
+
+        assert raw["employment_type"] == expected_employment_type
 
     def test_a_driver_error_propagates_so_the_scraper_can_skip_the_card(self, driver):
         driver.extractions = [RuntimeError("stale element")]
@@ -276,7 +296,7 @@ class TestScrapeJobsIncrementallyEntryPoint:
         linkedin_scraper.scrape_jobs_incrementally(driver, "kw", "loc", max_jobs=2)
 
         first, second = self.saved_rows(workdir)
-        assert list(first) == ["title", "company", "location", "description", "url"]
+        assert list(first) == ["title", "company", "location", "description", "url", "employment_type"]
         assert first["url"] == JOB_URL
         assert first["location"] == "Berlin, Germany"
         assert "Solid experience with Python and SQL" in first["description"]

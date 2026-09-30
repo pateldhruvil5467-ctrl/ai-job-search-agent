@@ -124,4 +124,5 @@ class SeleniumJobBrowser:
             "location": details.location,
             "description": details.description,
             "url": url,
+            "employment_type": details.employment_type,
         }

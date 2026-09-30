@@ -15,8 +15,8 @@ from models import Job
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FORMAT_JOBS_SCRIPT = REPO_ROOT / "format_jobs.py"
 
-# The jobs.csv contract: the original four columns keep their positions and url is appended.
-COLUMNS = ["title", "company", "location", "description", "url"]
+# The jobs.csv contract: the original four columns keep their positions, then url, then employment_type.
+COLUMNS = ["title", "company", "location", "description", "url", "employment_type"]
 # format_jobs.py still selects exactly these four for jobs_formatted.csv, so url is not forwarded.
 FORMATTED_COLUMNS = ["title", "company", "location", "description"]
 JOB_URL = "https://www.linkedin.com/jobs/view/3812345678/"
@@ -61,6 +61,7 @@ class TestJobsToDataFrame:
             "location": "Remote",
             "description": "multi\nline · text",
             "url": JOB_URL,
+            "employment_type": None,
         }
 
     def test_a_job_without_a_url_has_an_empty_url_cell(self):
@@ -69,8 +70,8 @@ class TestJobsToDataFrame:
     def test_the_original_four_columns_keep_their_positions(self):
         assert list(jobs_to_dataframe([make_job()]).columns)[:4] == FORMATTED_COLUMNS
 
-    def test_url_is_the_last_column(self):
-        assert list(jobs_to_dataframe([make_job()]).columns)[-1] == "url"
+    def test_employment_type_is_the_last_column(self):
+        assert list(jobs_to_dataframe([make_job()]).columns)[-1] == "employment_type"
 
 
 class TestCleanJobsDataFrame:
@@ -136,9 +137,9 @@ class TestSaveJobsCsv:
 
         save_jobs_csv([make_job()], path)
 
-        assert read_text_lf(path).splitlines()[0] == '"title","company","location","description","url"'
+        assert read_text_lf(path).splitlines()[0] == '"title","company","location","description","url","employment_type"'
 
-    def test_url_is_preserved_in_the_last_column(self, tmp_path):
+    def test_url_is_preserved_in_its_column(self, tmp_path):
         path = tmp_path / "jobs.csv"
 
         save_jobs_csv([make_job(url=JOB_URL)], path)
@@ -146,7 +147,8 @@ class TestSaveJobsCsv:
         with open(path, newline="", encoding="utf-8") as f:
             rows = list(csv.reader(f))
         assert rows[0] == COLUMNS
-        assert rows[1][-1] == JOB_URL
+        assert rows[1][-2] == JOB_URL
+        assert rows[1][-1] == ""
         assert rows[1][:4] == ["Software Engineer", "Acme", "Remote", "Berlin, Germany"]
 
     def test_an_empty_url_is_written_as_an_empty_quoted_field(self, tmp_path):
@@ -154,7 +156,7 @@ class TestSaveJobsCsv:
 
         save_jobs_csv([make_job()], path)
 
-        assert read_text_lf(path).splitlines()[1] == '"Software Engineer","Acme","Remote","Berlin, Germany",""'
+        assert read_text_lf(path).splitlines()[1] == '"Software Engineer","Acme","Remote","Berlin, Germany","",""'
 
     def test_an_empty_url_reads_back_as_empty_with_the_csv_module(self, tmp_path):
         path = tmp_path / "jobs.csv"
@@ -224,7 +226,8 @@ class TestSaveJobsCsv:
 
     def test_csv_format_is_unchanged_quote_all_with_doubled_quotes_and_escaped_backslashes(self, tmp_path):
         # Golden output. The first four columns are byte-for-byte what the pre-refactor implementation
-        # wrote (DataFrame.to_csv(index=False, quoting=1, escapechar='\\')); url is appended as column five.
+        # wrote (DataFrame.to_csv(index=False, quoting=1, escapechar='\\')); url is column five and
+        # employment_type is appended as column six.
         path = tmp_path / "jobs.csv"
         jobs = [
             make_job(
@@ -232,6 +235,7 @@ class TestSaveJobsCsv:
                 company="browserless",
                 description="Berlin, Germany · 1 month ago\n\nPromoted by hirer",
                 url=JOB_URL,
+                employment_type="Full-time",
             ),
             make_job(title="Unknown Title", company="Real Co"),
             make_job(
@@ -247,13 +251,13 @@ class TestSaveJobsCsv:
         save_jobs_csv(jobs, path)
 
         assert read_text_lf(path) == (
-            '"title","company","location","description","url"\n'
+            '"title","company","location","description","url","employment_type"\n'
             '"Senior Software Engineer","browserless","Remote","Berlin, Germany · 1 month ago\n'
             "\n"
-            'Promoted by hirer","https://www.linkedin.com/jobs/view/3812345678/"\n'
+            'Promoted by hirer","https://www.linkedin.com/jobs/view/3812345678/","Full-time"\n'
             '"Quote ""Test"", Inc","Back\\\\slash GmbH","München, Bayern","He said ""hi"", then\n'
-            'left","https://example.test/a?x=1&y=""q"",z\\\\w"\n'
-            '"No Link","Nowhere","Remote","Berlin, Germany",""\n'
+            'left","https://example.test/a?x=1&y=""q"",z\\\\w",""\n'
+            '"No Link","Nowhere","Remote","Berlin, Germany","",""\n'
         )
 
 
@@ -302,7 +306,7 @@ class TestDownstreamCompatibility:
         ]
 
 
-HEADER = '"title","company","location","description","url"'
+HEADER = '"title","company","location","description","url","employment_type"'
 LEGACY_HEADER = '"title","company","location","description"'
 
 
@@ -402,6 +406,17 @@ class TestLoadJobsCsvRoundTrip:
 
         assert [job.url for job in load_jobs_csv(tmp_path / "jobs.csv")] == [job.url for job in round_trip_jobs()]
 
+    def test_employment_type_survives_a_full_round_trip(self, tmp_path):
+        job = Job.from_scraped_data(
+            {"title": "T", "company": "C", "location": "L", "description": "D", "employment_type": "Part-time"}
+        )
+        save_jobs_csv([job], tmp_path / "jobs.csv")
+
+        loaded = load_jobs_csv(tmp_path / "jobs.csv")[0]
+
+        assert loaded.employment_type == "Part-time"
+        assert loaded == job
+
     def test_loading_and_saving_again_reproduces_the_writers_bytes(self, tmp_path):
         first, second = tmp_path / "first.csv", tmp_path / "second.csv"
         save_jobs_csv(round_trip_jobs(), first)
@@ -455,6 +470,19 @@ class TestLoadJobsCsvContents:
             Job("Second", "Co 2", "Berlin", "more", ""),
         ]
 
+    def test_a_legacy_five_column_file_without_employment_type_loads_with_none(self, tmp_path):
+        text = (
+            '"title","company","location","description","url"\r\n'
+            '"Old Role","Old Co","Remote","the old description","https://www.linkedin.com/jobs/view/1/"\r\n'
+        )
+
+        loaded = load_jobs_csv(write_text(tmp_path / "jobs.csv", text))
+
+        assert loaded == [
+            Job("Old Role", "Old Co", "Remote", "the old description", "https://www.linkedin.com/jobs/view/1/", None)
+        ]
+        assert loaded[0].employment_type is None
+
     def test_extra_columns_are_ignored_and_column_order_does_not_matter(self, tmp_path):
         text = '"notes","url","description","title","score","location","company"\r\n"n","https://www.linkedin.com/jobs/view/1/","d","T","9","L","C"\r\n'
 
@@ -470,13 +498,13 @@ class TestLoadJobsCsvContents:
         assert loaded == [Job("Only Title", "Unknown Company", "Unknown Location", "No description available", "")]
 
     def test_a_short_row_is_completed_with_defaults_and_a_long_row_loses_only_its_extra_cells(self, tmp_path):
-        text = HEADER + '\r\n"Short"\r\n"Long","Co","L","d","u","extra","cells"\r\n'
+        text = HEADER + '\r\n"Short"\r\n"Long","Co","L","d","u","Full-time","extra","cells"\r\n'
 
         loaded = load_jobs_csv(write_text(tmp_path / "jobs.csv", text))
 
         assert loaded == [
             Job("Short", "Unknown Company", "Unknown Location", "No description available", ""),
-            Job("Long", "Co", "L", "d", "u"),
+            Job("Long", "Co", "L", "d", "u", "Full-time"),
         ]
 
     def test_conversion_reuses_the_scrapers_sanitization(self, tmp_path):

@@ -14,7 +14,7 @@ import linkedin_scraper
 from linkedin_scraper import NoJobsExtractedError, build_search_url, scrape_jobs
 from models import Job
 
-COLUMNS = ["title", "company", "location", "description", "url"]
+COLUMNS = ["title", "company", "location", "description", "url", "employment_type"]
 JOB_URL = "https://www.linkedin.com/jobs/view/3812345678/"
 
 
@@ -161,8 +161,8 @@ class TestSuccessfulScrape:
         scrape_jobs(browser, "kw", "loc")
 
         assert saved_rows(workdir) == [
-            {"title": "Backend Engineer", "company": "Acme", "location": "Remote", "description": "First", "url": ""},
-            {"title": "Data Engineer", "company": "Globex", "location": "Berlin", "description": "Second", "url": ""},
+            {"title": "Backend Engineer", "company": "Acme", "location": "Remote", "description": "First", "url": "", "employment_type": ""},
+            {"title": "Data Engineer", "company": "Globex", "location": "Berlin", "description": "Second", "url": "", "employment_type": ""},
         ]
 
     def test_csv_has_the_expected_columns(self, workdir):
@@ -296,6 +296,7 @@ class TestIncompleteData:
                 "location": "Unknown Location",
                 "description": "No description available",
                 "url": "",
+                "employment_type": "",
             },
             {
                 "title": "Sparse",
@@ -303,6 +304,7 @@ class TestIncompleteData:
                 "location": "Unknown Location",
                 "description": "No description available",
                 "url": "",
+                "employment_type": "",
             },
         ]
 
@@ -333,7 +335,7 @@ class TestIncompleteData:
 
         scrape_jobs(FakeBrowser([blank, blank]), "kw", "loc")
 
-        assert (workdir / "jobs.csv").read_text(encoding="utf-8").strip() == '"title","company","location","description","url"'
+        assert (workdir / "jobs.csv").read_text(encoding="utf-8").strip() == '"title","company","location","description","url","employment_type"'
         assert "Total jobs saved: 0" in capsys.readouterr().out
 
 

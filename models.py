@@ -19,13 +19,16 @@ class Job:
     location: str
     description: str
     url: str = ""  # canonical LinkedIn job URL; "" when the scraper could not read one
+    employment_type: str | None = None  # e.g. "Part-time"/"Full-time"; None when not read from the page
 
     @classmethod
     def from_scraped_data(cls, data: dict) -> "Job":
         """Build a Job from the raw dict produced by the scraper.
 
         Single source of truth for turning scraped values into a Job:
-        str() + strip(), with fallback defaults for missing/falsy values.
+        str() + strip(), with fallback defaults for missing/falsy values. employment_type is the
+        one exception: it has no sentinel default, so a missing/falsy value becomes None, not a
+        string, and a present value is only stripped, never normalized.
         """
         return cls(
             title=str(data.get("title") or "Unknown Title").strip(),
@@ -33,6 +36,7 @@ class Job:
             location=str(data.get("location") or "Unknown Location").strip(),
             description=str(data.get("description") or "No description available").strip(),
             url=str(data.get("url") or "").strip(),
+            employment_type=str(value).strip() if (value := data.get("employment_type")) else None,
         )
 
 

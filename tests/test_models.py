@@ -47,6 +47,7 @@ class TestConstruction:
             "location",
             "description",
             "url",
+            "employment_type",
         ]
 
 
@@ -401,8 +402,15 @@ class TestJobKeyNeverRaises:
 
 
 class TestJobKeyIsNotPartOfTheJob:
-    def test_job_has_exactly_the_original_five_fields(self):
-        assert [f.name for f in dataclasses.fields(Job)] == ["title", "company", "location", "description", "url"]
+    def test_job_has_exactly_the_expected_six_fields(self):
+        assert [f.name for f in dataclasses.fields(Job)] == [
+            "title",
+            "company",
+            "location",
+            "description",
+            "url",
+            "employment_type",
+        ]
 
     def test_the_key_is_not_a_field_property_or_csv_column(self):
         assert not hasattr(Job, "key")

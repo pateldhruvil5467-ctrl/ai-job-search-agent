@@ -94,7 +94,7 @@ load_jobs_csv()
 
 ## 📄 CSV schema (`jobs.csv`)
 
-Exactly five columns, in this order:
+Exactly six columns, in this order:
 
 ```
 title
@@ -102,9 +102,10 @@ company
 location
 description
 url
+employment_type
 ```
 
-Written with `csv.QUOTE_ALL` and `\` as the escape character (see `CSV_ESCAPECHAR` in `job_storage.py`); `load_jobs_csv()` reads with the same settings. `url` is optional on read for backward compatibility with older four-column files (it becomes `""` when absent), but `title`, `company`, `location`, and `description` are required — a file missing any of those raises `ValueError`.
+Written with `csv.QUOTE_ALL` and `\` as the escape character (see `CSV_ESCAPECHAR` in `job_storage.py`); `load_jobs_csv()` reads with the same settings. `url` is optional on read for backward compatibility with older four-column files (it becomes `""` when absent), and `employment_type` is likewise optional on read for backward compatibility with older five-column files (it becomes `None` when absent), but `title`, `company`, `location`, and `description` are required — a file missing any of those raises `ValueError`.
 
 `jobs_formatted.csv` (produced by the separate `format_jobs.py` pipeline) is **not** the same schema: it has only the original four columns and truncated description text, and should not be read with `load_jobs_csv()`.
 

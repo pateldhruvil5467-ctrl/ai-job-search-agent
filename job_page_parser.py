@@ -26,6 +26,7 @@ class JobPageDetails:
 
     location: str | None
     description: str | None
+    employment_type: str | None
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,11 @@ _NOT_A_PLACE = frozenset({"promoted", "reposted", "viewed", "applied", "saved", 
 
 _WORKPLACE_TYPES = {"remote": "Remote", "hybrid": "Hybrid", "on-site": "On-site", "onsite": "On-site", "on site": "On-site"}
 _SHOWN_IN_LOCATION = frozenset({"Remote", "Hybrid"})  # on-site is implied by a plain place name
+
+# Only the two employment-type chip values actually observed in a captured page. Deliberately not a
+# larger vocabulary: unlike workplace type, no chip is ever suppressed here, so the dict value is
+# only a case-insensitive matching aid, never a substitute for an unobserved spelling.
+_EMPLOYMENT_TYPES = {"part-time": "Part-time", "full-time": "Full-time"}
 _UI_LINES = frozenset({"show more", "show less"})
 
 # How far around the header line to look for a workplace-type label (top card only).
@@ -333,6 +339,19 @@ def _workplace_type(scope: _Node) -> str | None:
     return None
 
 
+def _employment_type(scope: _Node) -> str | None:
+    """A label that is, by itself, exactly Part-time / Full-time inside the top card."""
+    stack = [scope]
+    while stack:
+        node = stack.pop()
+        if len(_text(node)) <= 40:
+            label = _normalize(_text(node)).removeprefix("- ").casefold()
+            if label in _EMPLOYMENT_TYPES:
+                return _EMPLOYMENT_TYPES[label]
+        stack.extend(reversed([child for child in node.children if isinstance(child, _Node)]))
+    return None
+
+
 def _compose_location(place: str, workplace: str | None) -> str:
     if workplace not in _SHOWN_IN_LOCATION:
         return place
@@ -364,15 +383,36 @@ def _extract_location(root: _Node) -> str | None:
 
 
 # ---------------------------------------------------------------------------------------------
+# Employment type
+# ---------------------------------------------------------------------------------------------
+
+def _extract_employment_type(root: _Node) -> str | None:
+    """The employment-type chip from the same top-card neighborhood _extract_location reads.
+
+    Only a structured chip populates this; there is no fallback selector and no inference from
+    title, description, or any other prose, so a page with no header line or no matching chip
+    (job_detail_missing_location.html) correctly gives None.
+    """
+    candidates = _header_candidates(root)
+    chosen = next((c for c in candidates if _has_company_link(_neighborhood(c[1]))), None)
+    if chosen is None and len(candidates) == 1:
+        chosen = candidates[0]
+    if chosen is not None:
+        return _employment_type(_neighborhood(chosen[1]))
+    return None
+
+
+# ---------------------------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------------------------
 
 def parse_job_page(html: str, max_description_chars: int = MAX_DESCRIPTION_CHARS) -> JobPageDetails:
-    """Read the location and the posting text from a job page's HTML."""
+    """Read the location, employment type, and the posting text from a job page's HTML."""
     root = _parse(html)
     return JobPageDetails(
         location=_extract_location(root),
         description=_extract_description(root, max_description_chars),
+        employment_type=_extract_employment_type(root),
     )
 
 
